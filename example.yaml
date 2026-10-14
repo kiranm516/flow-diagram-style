@@ -1,0 +1,38 @@
+title: Temporal Connector Sync
+direction: right
+
+groups:
+  connector: {label: Connector Namespace}
+  workflows: {label: Connector Workflows, parent: connector}
+  front:     {label: Front Namespace}
+
+nodes:
+  tclient:    {label: Temporal Client, role: client, group: connector}
+  slack:      {label: SlackSyncWorkflow, role: workflow, group: workflows}
+  github:     {label: GitHubSyncWorkflow, role: workflow, group: workflows}
+  zendesk:    {label: ZendeskSyncWorkflow, role: workflow, group: workflows}
+  activities: {label: Connector Activities, role: activity, group: connector}
+  temporal:   {label: Temporal Service, role: service}
+  external:   {label: External APIs, role: external}
+  gcs:        {label: Google Cloud Storage, role: storage}
+  frontapi:   {label: Front API, role: storage}
+  workers:    {label: "Upsert Queue\nWorkers", role: member, group: front}
+  uqwf:       {label: "Upsert Queue\nWorkflows", role: member, group: front}
+  uqact:      {label: "Upsert Queue\nActivities", role: member, group: front}
+  fclient:    {label: "Temporal Client\nFront Namespace", role: member, group: front}
+  core:       {label: Core System, role: core}
+
+edges:
+  - [tclient, temporal, Launches Workflows]
+  - [temporal, workflows, Dispatches Tasks]
+  - [workflows, activities, Execute]
+  - [external, activities, Fetch Data]
+  - [activities, gcs, Store Data]
+  - [activities, frontapi, Enqueue Upsert]
+  - [temporal, workers, Dispatches Tasks]
+  - [workers, uqwf, Executes]
+  - [uqwf, uqact, Executes]
+  - [gcs, uqact, Retrieve]
+  - [frontapi, fclient, Launch Workflow]
+  - [fclient, temporal, Launches Workflows]
+  - [uqact, core, Upsert Data]

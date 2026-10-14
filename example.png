@@ -1,0 +1,15 @@
+{
+  "name": "flow-diagram-style",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs ../example.yaml ../flow-diagram.html",
+    "render": "node flowdiag.mjs"
+  },
+  "dependencies": {
+    "elkjs": "^0.12.0",
+    "js-yaml": "^5.4.3",
+    "@fontsource/inter": "^5.0.0",
+    "@fontsource/jetbrains-mono": "^5.0.0"
+  }
+}

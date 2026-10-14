@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flow Diagram</title>
+<style>
+@font-face { font-family: 'Inter'; src: url(data:font/woff2;base64,__FONT_INTER__) format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; src: url(data:font/woff2;base64,__FONT_MONO__) format('woff2'); }
+:root {
+  --bg: #F6F7F9; --panel: #FFFFFF; --ink: #111827; --muted: #6B7280; --line: #E5E7EB;
+  --accent: #3E5577; --accent-ink: #FFFFFF; --err-bg: #FEF2F2; --err: #B91C1C; --ok: #047857;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 Inter, 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; }
+header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+header h1 { font: 500 15px 'JetBrains Mono', Consolas, monospace; margin: 0 8px 0 0; letter-spacing: -0.01em; }
+.spacer { flex: 1; }
+button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: #9CA3AF; }
+button:disabled { opacity: .45; cursor: default; }
+select { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 8px; border-radius: 6px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.group { display: flex; gap: 6px; flex-wrap: wrap; }
+.sep { width: 1px; height: 22px; background: var(--line); }
+main { flex: 1; display: grid; grid-template-columns: minmax(320px, 36%) 1fr; min-height: 0; }
+.left { display: flex; flex-direction: column; border-right: 1px solid var(--line); min-height: 0; background: var(--panel); }
+textarea { flex: 1; width: 100%; border: 0; resize: none; padding: 14px 16px; font: 13px/1.55 'JetBrains Mono', Consolas, monospace; color: var(--ink); background: var(--panel); outline: none; tab-size: 2; }
+details { border-top: 1px solid var(--line); padding: 8px 16px 12px; font-size: 13px; max-height: 45%; overflow: auto; }
+summary { cursor: pointer; color: var(--muted); padding: 4px 0; }
+.roles { display: grid; grid-template-columns: auto auto 1fr; gap: 4px 10px; align-items: center; margin: 8px 0 10px; }
+.sw { width: 34px; height: 16px; border-radius: 3px; }
+code, pre { font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px; }
+pre { background: var(--bg); padding: 8px 10px; border-radius: 6px; overflow: auto; margin: 6px 0; }
+.right { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+#status { padding: 8px 16px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--panel); min-height: 36px; }
+#status.err { background: var(--err-bg); color: var(--err); white-space: pre-wrap; }
+#status.ok { color: var(--ok); }
+#stage { flex: 1; overflow: auto; padding: 20px; display: flex; align-items: flex-start; justify-content: center; }
+#stage svg { max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 0 0 1px var(--line); border-radius: 4px; }
+#stage.actual svg { max-width: none; }
+.hint { color: var(--muted); font-size: 12px; }
+@media (max-width: 800px) { main { grid-template-columns: 1fr; grid-template-rows: 45% 55%; } .left { border-right: 0; border-bottom: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>flow-diagram</h1>
+  <button class="primary" id="renderBtn" title="Ctrl/Cmd + Enter">Render</button>
+  <label class="hint" for="theme" style="margin-left:4px">Theme</label>
+  <select id="theme" aria-label="Colour theme"></select>
+  <span class="spacer"></span>
+  <div class="group">
+    <button id="copyPng" disabled title="Paste into Teams, PowerPoint, Confluence">Copy image</button>
+    <button id="copyDrawio" disabled title="Paste into draw.io / LeanIX / Confluence draw.io (Ctrl+V on the canvas)">Copy for draw.io</button>
+  </div>
+  <span class="sep"></span>
+  <div class="group">
+    <button id="dlPng" disabled>PNG</button>
+    <button id="dlSvg" disabled>SVG</button>
+    <button id="dlDrawio" disabled>.drawio</button>
+  </div>
+  <span class="sep"></span>
+  <button id="zoomBtn" disabled title="Toggle fit / actual size">Actual size</button>
+</header>
+<main>
+  <section class="left">
+    <textarea id="spec" wrap="off" spellcheck="false" aria-label="Diagram spec (YAML)"></textarea>
+    <details>
+      <summary>Spec reference</summary>
+      <div class="roles" id="roles"></div>
+<pre>title: My Flow            # file name
+direction: right          # right | down | auto
+frame: [1600, 900]        # fit target (optional)
+theme: tint               # classic|tint|teal|mono|okabe|midnight
+sizing: role              # role|group|all|fit
+groups:
+  ns: {label: Namespace}
+  sub: {label: Sub, parent: ns, direction: auto}
+nodes:
+  a: {label: "Two line\nlabel", role: client, group: ns}
+  b: {label: Service, role: service}
+edges:
+  - [a, b, Calls Service]   # [from, to, label]</pre>
+      <p class="hint">Ctrl/Cmd + Enter renders. Everything runs locally in this page; nothing is uploaded.
+      In draw.io / LeanIX: click the canvas and press Ctrl+V after “Copy for draw.io”, or use Extras → Edit Diagram.</p>
+    </details>
+  </section>
+  <section class="right">
+    <div id="status">Loading…</div>
+    <div id="stage"></div>
+  </section>
+</main>
+
+<script>/*__ELK__*/</script>
+<script>/*__YAML__*/</script>
+<script>/*__ENGINE__*/</script>
+<script>
+(() => {
+  const EXAMPLE = __EXAMPLE__;
+  const FONT_CSS = "@font-face{font-family:'Inter';src:url(data:font/woff2;base64,__FONT_INTER__) format('woff2');}" +
+                   "@font-face{font-family:'JetBrains Mono';src:url(data:font/woff2;base64,__FONT_MONO__) format('woff2');}";
+  const $ = (id) => document.getElementById(id);
+  const ta = $("spec"), stage = $("stage"), status = $("status");
+  const exportBtns = ["copyPng", "copyDrawio", "dlPng", "dlSvg", "dlDrawio", "zoomBtn"].map($);
+  const KEY = "flowdiag.spec.v1";
+
+
+  try { ta.value = localStorage.getItem(KEY) || EXAMPLE; } catch { ta.value = EXAMPLE; }
+
+  const themeSel = $("theme");
+  const THEME_LABELS = { classic: "Classic", tint: "Soft Tint", teal: "Teal 2026", mono: "Graphite", okabe: "Colour-blind safe", midnight: "Midnight (dark)" };
+  themeSel.innerHTML = Object.keys(THEMES).map((k) => `<option value="${k}">${THEME_LABELS[k] || k}</option>`).join("");
+  try { themeSel.value = localStorage.getItem(KEY + ".theme") || "classic"; } catch {}
+  function paintSwatches() {
+    const t = THEMES[themeSel.value];
+    $("roles").innerHTML = Object.entries(t.roles).map(([k, r]) =>
+      `<span class="sw" style="background:${r.fill};${r.stroke ? `outline:1px ${r.dash ? "dashed" : "solid"} ${r.stroke};outline-offset:-1px;` : ""}"></span><code>${k}</code><span></span>`).join("");
+  }
+  paintSwatches();
+  themeSel.onchange = () => {
+    try { localStorage.setItem(KEY + ".theme", themeSel.value); } catch {}
+    paintSwatches();
+    if (current) { current.best.theme = themeSel.value; current.svg = engine.toSVG(current.best, { fontCSS: FONT_CSS }); stage.innerHTML = current.svg; }
+  };
+
+  // real text measurement with the embedded fonts
+  const ctx = document.createElement("canvas").getContext("2d");
+  const measure = (s, size, kind) => { ctx.font = `${size}px ${kind === "mono" ? "'JetBrains Mono'" : "Inter"}`; return ctx.measureText(s).width; };
+  const engine = createEngine({ ELK, measure });
+
+  let current = null, runId = 0;
+  const setStatus = (msg, cls = "") => { status.textContent = msg; status.className = cls; };
+  const enable = (on) => exportBtns.forEach((b) => (b.disabled = !on));
+  const safeName = () => String((current && current.spec.title) || "flow-diagram").trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "flow-diagram";
+
+  async function render() {
+    const id = ++runId;
+    let spec;
+    try { spec = jsyaml.load(ta.value); } catch (e) { setStatus("YAML error: " + e.message, "err"); return; }
+    try { localStorage.setItem(KEY, ta.value); } catch {}
+    setStatus("Laying out…");
+    try {
+      const { best, report } = await engine.layout(spec, {
+        onProgress: (k, n) => { if (id === runId) setStatus(`Trying layouts… ${k}/${n}`); return new Promise((r) => setTimeout(r, 0)); },
+      });
+      if (id !== runId) return;
+      if (spec.theme && THEMES[String(spec.theme).toLowerCase()]) { themeSel.value = String(spec.theme).toLowerCase(); paintSwatches(); }
+      best.theme = themeSel.value;
+      const svg = engine.toSVG(best, { fontCSS: FONT_CSS });
+      current = { spec, best, svg };
+      stage.innerHTML = svg;
+      enable(true);
+      const s = best.s, ok = report.filter((r) => r.s).length;
+      const issues = [s.crossings && `${s.crossings} crossing${s.crossings > 1 ? "s" : ""}`, s.through && `${s.through} line(s) through boxes`].filter(Boolean);
+      setStatus(`Best of ${ok} layouts · ${Math.round(best.W)}×${Math.round(best.H)} · ${issues.length ? issues.join(", ") : "no crossings"}`, "ok");
+    } catch (e) {
+      if (id === runId) setStatus(String(e.message || e), "err");
+    }
+  }
+
+  // ---------- exports ----------
+  function download(name, blob) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  function pngBlob(scale = 2) {
+    return new Promise((resolve, reject) => {
+      const { svg, best } = current;
+      const img = new Image();
+      const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = Math.ceil(best.W * scale); c.height = Math.ceil(best.H * scale);
+        const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG encode failed"))), "image/png");
+      };
+      img.onerror = () => reject(new Error("could not rasterize SVG"));
+      img.src = url;
+    });
+  }
+  const flash = (btn, text) => { const t = btn.textContent; btn.textContent = text; setTimeout(() => (btn.textContent = t), 1400); };
+
+  $("dlSvg").onclick = () => download(safeName() + ".svg", new Blob([current.svg], { type: "image/svg+xml" }));
+  $("dlDrawio").onclick = () => download(safeName() + ".drawio", new Blob([engine.toDrawio(current.best, safeName())], { type: "application/xml" }));
+  $("dlPng").onclick = async () => { try { download(safeName() + ".png", await pngBlob()); } catch (e) { setStatus(e.message, "err"); } };
+  $("copyPng").onclick = async (ev) => {
+    try { await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob() })]); flash(ev.target, "Copied ✓"); }
+    catch (e) { setStatus("Clipboard blocked by the browser — use the PNG button instead. (" + e.message + ")", "err"); }
+  };
+  $("copyDrawio").onclick = async (ev) => {
+    const xml = engine.toDrawioModel(current.best);
+    try { await navigator.clipboard.writeText(xml); flash(ev.target, "Copied ✓"); }
+    catch {
+      const t = document.createElement("textarea"); t.value = xml; document.body.appendChild(t); t.select();
+      const ok = document.execCommand("copy"); t.remove();
+      ok ? flash(ev.target, "Copied ✓") : setStatus("Clipboard blocked — use the .drawio button and File → Import in draw.io.", "err");
+    }
+  };
+  $("zoomBtn").onclick = (ev) => { const on = stage.classList.toggle("actual"); ev.target.textContent = on ? "Fit" : "Actual size"; };
+
+  $("renderBtn").onclick = render;
+  ta.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); render(); }
+    if (e.key === "Tab") { e.preventDefault(); const s = ta.selectionStart; ta.setRangeText("  ", s, ta.selectionEnd, "end"); }
+  });
+  let timer;
+  ta.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(render, 1200); });
+
+  Promise.all([document.fonts.load("17px Inter"), document.fonts.load("16px 'JetBrains Mono'")]).catch(() => {}).then(render);
+})();
+</script>
+</body>
+</html>
