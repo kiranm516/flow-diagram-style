@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs ../example.yaml ../flow-diagram.html",
-    "render": "node flowdiag.mjs"
+    "render": "node flowdiag.mjs",
+    "test": "node test.mjs"
   },
   "dependencies": {
     "elkjs": "^0.12.0",

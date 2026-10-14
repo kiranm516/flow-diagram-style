@@ -1,0 +1,21 @@
+title: Data Pipeline
+groups:
+  ingest: {label: Ingestion}
+  proc:   {label: Processing}
+nodes:
+  src:   {label: Source DBs, role: external}
+  cdc:   {label: CDC Connector, role: activity, group: ingest}
+  kafka: {label: Kafka, role: storage, group: ingest}
+  clean: {label: Cleanse, role: member, group: proc}
+  enrich: {label: Enrich, role: member, group: proc}
+  agg:   {label: Aggregate, role: member, group: proc}
+  dw:    {label: Warehouse, role: core}
+  bi:    {label: BI Dashboards, role: client}
+edges:
+  - [src, cdc, Streams Changes]
+  - [cdc, kafka, Publishes]
+  - [kafka, clean, Consumes]
+  - [clean, enrich, Passes Rows]
+  - [enrich, agg, Passes Rows]
+  - [agg, dw, Loads]
+  - [bi, dw, Queries]

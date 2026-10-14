@@ -8,23 +8,14 @@
 // Pipeline: spec -> ELK graph (labels NOT given to ELK) -> search over layouts
 // (direction, folded groups, placement, spacing) -> place labels ourselves -> score -> best.
 
-export const ROLES = {
-  client:   { fill: "#DCEEFB", text: "#111827", r: 6 },
-  service:  { fill: "#A78BFA", text: "#FFFFFF", r: 6 },
-  member:   { fill: "#FCE4EC", text: "#111827", r: 6 },
-  workflow: { fill: "#3E5577", text: "#FFFFFF", r: 6 },
-  activity: { fill: "#6B6B6B", text: "#FFFFFF", r: 2 },
-  external: { fill: "#5BD075", text: "#111827", r: 2 },
-  storage:  { fill: "#FBC59A", text: "#111827", r: 2 },
-  core:     { fill: "#1F3557", text: "#FFFFFF", r: 6 },
-};
+// Role -> corner radius. The role list itself; colours live in THEMES.
+export const ROLES = { client: 6, service: 6, member: 6, workflow: 6, activity: 2, external: 2, storage: 2, core: 6 };
 
 // ---------- colour themes ----------
 // Each theme: canvas colours + one entry per role {fill, text, stroke?, dash?, r}.
 // Rule of thumb used throughout: tinted fill + same-hue dark text, or bold fill + white text;
 // at most two bold "anchors" (service = hub, core = destination) so the eye lands there first.
-const BASE_R = { client: 6, service: 6, member: 6, workflow: 6, activity: 2, external: 2, storage: 2, core: 6 };
-const mk = (canvas, roles) => ({ canvas, roles: Object.fromEntries(Object.entries(roles).map(([k, v]) => [k, { r: BASE_R[k], ...v }])) });
+const mk = (canvas, roles) => ({ canvas, roles: Object.fromEntries(Object.entries(roles).map(([k, v]) => [k, { r: ROLES[k], ...v }])) });
 export const THEMES = {
   classic: mk({ bg: "#FFFFFF", edge: "#6B7280", edgeText: "#374151", groupStroke: "#9CA3AF", groupText: "#111827" }, {
     client:   { fill: "#DCEEFB", text: "#111827" },
@@ -103,9 +94,7 @@ export const THEME = {
   sans: "Inter", mono: "JetBrains Mono",
   sansStack: "Inter, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
   monoStack: "'JetBrains Mono', Consolas, 'DejaVu Sans Mono', Menlo, monospace",
-  nodeSize: 17, labelSize: 14.5, groupSize: 16,
-  edge: "#6B7280", edgeText: "#374151", groupStroke: "#9CA3AF", groupText: "#111827",
-  bg: "#FFFFFF", corner: 10,
+  nodeSize: 17, labelSize: 14.5, groupSize: 16, corner: 10,
 };
 const SZ = { padX: 28, padY: 18, minW: 170, minH: 64, lineH: 23, groupTop: 54, groupPad: 26, labelH: 20 };
 
@@ -123,13 +112,30 @@ export function approxMeasure(s, size, kind) {
   return w * size;
 }
 
-export function createEngine({ ELK, measure = approxMeasure }) {
+// Layout score weights (lower total wins). detour = path length beyond the straight
+// Manhattan distance between an edge's ends, i.e. how far it wanders around the diagram.
+export const WEIGHTS = { crossings: 30, through: 80, bends: 2.5, length: 1 / 300, detour: 0.02, fit: 200, titleHits: 60 };
+
+export function createEngine({ ELK, measure = approxMeasure, weights = {} }) {
+  const K = { ...WEIGHTS, ...weights };
   const T = THEME;
   const lines = (s) => String(s).split("\n");
   const sansW = (s, size) => measure(s, size, "sans");
   const titleW = (s) => measure(s, T.groupSize, "mono");
   const labelW = (s) => Math.round(sansW(s, T.labelSize) + 16);
-  const titleRect = (g) => ({ x: g.x + 14, y: g.y + 20, w: titleW(g.title) + 12, h: 24 });
+  const titleRect = (g) => ({ x: g.x + (g.titleDx ?? 14), y: g.y + 20, w: titleW(g.title) + 12, h: 24 });
+  // Slide each group title along the top border to the leftmost spot no edge crosses.
+  function placeTitles(E, groups) {
+    const S = E.flatMap((e) => segs(e.pts));
+    for (const g of groups) {
+      const w = titleW(g.title) + 12;
+      for (let dx = 14; dx + w + 14 <= g.width; dx += 10) {
+        g.titleDx = dx;
+        if (!S.some((sg) => segHitsRect(sg, titleRect(g)))) break;
+      }
+      if (S.some((sg) => segHitsRect(sg, titleRect(g)))) g.titleDx = 14;
+    }
+  }
 
   // ---------- spec helpers ----------
   function validate(spec) {
@@ -140,10 +146,15 @@ export function createEngine({ ELK, measure = approxMeasure }) {
     for (const id of Object.keys(spec.nodes || {})) { if (ids.has(id)) throw new Error(`id "${id}" used for both a group and a node`); ids.add(id); }
     for (const [id, n] of Object.entries(spec.nodes || {})) {
       if (n.group && !spec.groups?.[n.group]) throw new Error(`node "${id}": unknown group "${n.group}"`);
-      if (n.role && !ROLES[n.role]) throw new Error(`node "${id}": unknown role "${n.role}" (use ${Object.keys(ROLES).join(", ")})`);
+      if (!n || typeof n !== "object") throw new Error(`node "${id}": expected {label, role}`);
+      if (!ROLES[n.role]) throw new Error(`node "${id}": ${n.role ? `unknown role "${n.role}"` : "missing role"} (use ${Object.keys(ROLES).join(", ")})`);
     }
     for (const [id, g] of Object.entries(spec.groups || {})) if (g.parent && !spec.groups[g.parent]) throw new Error(`group "${id}": unknown parent "${g.parent}"`);
-    return normEdges(spec).map((e) => { if (!ids.has(e.from) || !ids.has(e.to)) throw new Error(`edge ${e.from} -> ${e.to}: unknown id`); return e; });
+    return normEdges(spec).map((e) => {
+      if (!ids.has(e.from) || !ids.has(e.to)) throw new Error(`edge ${e.from} -> ${e.to}: unknown id`);
+      if (!e.label.trim()) throw new Error(`edge ${e.from} -> ${e.to}: missing label (use [from, to, Verb Phrase])`);
+      return e;
+    });
   }
   function normEdges(spec) {
     return (spec.edges || []).map((e, i) => {
@@ -248,7 +259,7 @@ export function createEngine({ ELK, measure = approxMeasure }) {
     }
     const sizes = nodeSizes(spec);
     for (const [id, nd] of Object.entries(nodes)) {
-      const role = ROLES[nd.role] ? nd.role : "member";
+      const role = nd.role;
       const label = String(nd.label ?? id);
       const ls = lines(label);
       const { w, h } = sizes[id];
@@ -363,20 +374,24 @@ export function createEngine({ ELK, measure = approxMeasure }) {
   // ---------- scoring ----------
   function score(laid, E, nodes, groups, frame) {
     const W = laid.width, H = laid.height, S = E.map((e) => segs(e.pts));
-    let crossings = 0, bends = 0, length = 0, through = 0, titleHits = 0;
+    let crossings = 0, bends = 0, length = 0, detour = 0, through = 0, titleHits = 0;
     for (let i = 0; i < S.length; i++) for (let j = i + 1; j < S.length; j++) for (const a of S[i]) for (const b of S[j]) if (cross(a, b)) crossings++;
     for (const e of E) {
       bends += Math.max(0, e.pts.length - 2);
+      const p0 = e.pts[0], pn = e.pts[e.pts.length - 1];
+      detour -= Math.abs(pn.x - p0.x) + Math.abs(pn.y - p0.y);
       for (const sg of segs(e.pts)) {
-        length += segLen(sg);
+        length += segLen(sg); detour += segLen(sg);
         for (const n of nodes) if (n.id !== e.from && n.id !== e.to && segHitsRect(sg, { x: n.x + 2, y: n.y + 2, w: n.width - 4, h: n.height - 4 })) through++;
       }
     }
+    placeTitles(E, groups);
     const labelCost = placeLabels(E, nodes, groups);
     for (const g of groups) { const r = titleRect(g); for (const e of E) for (const sg of segs(e.pts)) if (segHitsRect(sg, r)) titleHits++; }
     const fit = Math.min(frame[0] / W, frame[1] / H);
-    const total = crossings * 30 + through * 80 + bends * 2.5 + length / 300 - Math.log(fit) * 200 + titleHits * 12 + labelCost;
-    return { total: +total.toFixed(1), crossings, through, bends, labelCost: Math.round(labelCost), titleHits, fit: +fit.toFixed(2), W: Math.round(W), H: Math.round(H) };
+    const total = crossings * K.crossings + through * K.through + bends * K.bends + length * K.length + detour * K.detour
+      - Math.log(fit) * K.fit + titleHits * K.titleHits + labelCost;
+    return { total: +total.toFixed(1), crossings, through, bends, detour: Math.round(detour), labelCost: Math.round(labelCost), titleHits, fit: +fit.toFixed(2), W: Math.round(W), H: Math.round(H) };
   }
 
   // ---------- search ----------
@@ -474,7 +489,7 @@ export function createEngine({ ELK, measure = approxMeasure }) {
       return `<mxGeometry x="${f2(x.x - (p ? p.x : 0))}" y="${f2(x.y - (p ? p.y : 0))}" width="${f2(x.width)}" height="${f2(x.height)}" as="geometry"/>`;
     };
     for (const g of groups) {
-      const style = `rounded=0;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;fillColor=none;dashed=1;dashPattern=6 5;strokeColor=${C.groupStroke};strokeWidth=1.4;verticalAlign=top;align=left;spacingLeft=14;spacingTop=12;fontFamily=${T.mono},Consolas,Courier New,monospace;fontSize=${T.groupSize};fontColor=${C.groupText};labelBackgroundColor=${C.bg};`;
+      const style = `rounded=0;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;fillColor=none;dashed=1;dashPattern=6 5;strokeColor=${C.groupStroke};strokeWidth=1.4;verticalAlign=top;align=left;spacingLeft=${g.titleDx ?? 14};spacingTop=12;fontFamily=${T.mono},Consolas,Courier New,monospace;fontSize=${T.groupSize};fontColor=${C.groupText};labelBackgroundColor=${C.bg};`;
       cells.push(`<mxCell id="${cid(g.id)}" value="${xa(g.title)}" style="${style}" vertex="1" parent="${g.parentId ? cid(g.parentId) : "1"}">${geom(g)}</mxCell>`);
     }
     for (const n of nodes) {

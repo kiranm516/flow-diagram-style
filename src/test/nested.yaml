@@ -1,0 +1,27 @@
+title: Auth Platform
+direction: auto
+groups:
+  edge: {label: Edge}
+  core: {label: Identity Core}
+  tok:  {label: Token Service, parent: core}
+nodes:
+  user:  {label: User Browser, role: client}
+  cdn:   {label: CDN, role: activity, group: edge}
+  waf:   {label: WAF, role: activity, group: edge}
+  login: {label: Login API, role: service, group: core}
+  mfa:   {label: MFA Check, role: member, group: core}
+  issue: {label: Issue JWT, role: workflow, group: tok}
+  sign:  {label: Sign Key, role: workflow, group: tok}
+  idp:   {label: Corporate IdP, role: external}
+  users: {label: User Store, role: storage}
+  audit: {label: Audit Log, role: core}
+edges:
+  - [user, cdn, Requests Page]
+  - [cdn, waf, Forwards]
+  - [waf, login, Submits Login]
+  - [login, idp, Federates]
+  - [login, users, Looks Up User]
+  - [login, mfa, Challenges]
+  - [mfa, tok, Requests Token]
+  - [issue, sign, Signs]
+  - [tok, audit, Records Issue]

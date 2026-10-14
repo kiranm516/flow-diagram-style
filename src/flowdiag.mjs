@@ -24,7 +24,7 @@ function fontCSS() {
 }
 
 const spec = yaml.load(fs.readFileSync(specPath, "utf8"));
-const eng = createEngine({ ELK });
+const eng = createEngine({ ELK, weights: process.env.FLOWDIAG_WEIGHTS ? JSON.parse(process.env.FLOWDIAG_WEIGHTS) : {} });
 const { best, report } = await eng.layout(spec);
 fs.writeFileSync(out + ".svg", eng.toSVG(best, { fontCSS: fontCSS() }));
 fs.writeFileSync(out + ".drawio", eng.toDrawio(best, path.basename(out)));

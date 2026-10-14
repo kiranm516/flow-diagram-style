@@ -1,0 +1,50 @@
+{
+  "example": {
+    "total": 263.2,
+    "crossings": 1,
+    "through": 0,
+    "bends": 21,
+    "detour": 1514,
+    "labelCost": 46,
+    "titleHits": 0,
+    "fit": 0.69,
+    "W": 2332,
+    "H": 982
+  },
+  "hub": {
+    "total": 151.7,
+    "crossings": 0,
+    "through": 0,
+    "bends": 8,
+    "detour": 0,
+    "labelCost": 104,
+    "titleHits": 0,
+    "fit": 0.9,
+    "W": 1778,
+    "H": 334
+  },
+  "nested": {
+    "total": 96.9,
+    "crossings": 0,
+    "through": 0,
+    "bends": 6,
+    "detour": 0,
+    "labelCost": 17,
+    "titleHits": 0,
+    "fit": 0.77,
+    "W": 2083,
+    "H": 680
+  },
+  "pipeline": {
+    "total": 71.7,
+    "crossings": 0,
+    "through": 0,
+    "bends": 4,
+    "detour": 0,
+    "labelCost": 16,
+    "titleHits": 0,
+    "fit": 0.82,
+    "W": 1962,
+    "H": 528
+  }
+}

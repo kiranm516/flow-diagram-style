@@ -17,8 +17,9 @@ colors, fonts, SVG, Mermaid or draw.io XML yourself.
     (Fallback: download `.drawio` and use File → Import, or Extras → Edit Diagram.)
   - **Copy image** → paste into Teams or PowerPoint.
   - **PNG / SVG** → Confluence pages, slides.
-- **With code execution (Node 18+):** `cd src && npm install`, then
-  `node flowdiag.mjs ../my.yaml ../my` → `my.svg` + `my.drawio`.
+- **With code execution (Node 18+):** once, `npm install --prefix <skill>/src`; then
+  `node <skill>/src/flowdiag.mjs my.yaml out/my` → `out/my.svg` + `out/my.drawio`
+  (paths relative to the current directory; add `--report` to see the runner-up layouts).
 
 ## Spec format
 ```yaml
@@ -47,7 +48,7 @@ Optional per node: `col: 0..n` pins left-to-right column order (only when the
 automatic order is wrong). See `example.yaml` / `example.png` for a full one.
 
 ## Roles
-| role       | use for                                         | look               |
+| role       | use for                                         | look (classic)     |
 |------------|-------------------------------------------------|--------------------|
 | `client`   | SDK/client/UI that initiates work               | light blue         |
 | `service`  | central orchestrator / hub / bus                | purple, white text |
@@ -58,7 +59,8 @@ automatic order is wrong). See `example.yaml` / `example.png` for a full one.
 | `storage`  | data stores, queues, APIs that hold/accept data | peach              |
 | `core`     | the system of record / final destination        | navy, white text   |
 
-Unknown roles are rejected. At most ~6 roles per diagram; one role = one meaning.
+Every node needs a role and every edge a label; the renderer rejects specs without them.
+At most ~6 roles per diagram; one role = one meaning.
 
 ## Themes
 Colour never changes meaning: the role decides the slot, the theme decides the paint.
@@ -78,15 +80,12 @@ Leave `theme` out unless the user asks; they can also switch it in the tool.
 - Declare nodes in rough reading order (left to right); the layout respects it when it can.
 - Ids are short snake_case and unique across groups and nodes.
 
-## How layout works (so you can steer it)
-The renderer tries 16–32 layouts and keeps the best. A group whose members form
-a chain (A→B→C inside it) may be **folded** — stacked top-to-bottom inside its
-box — so long chains don't stretch the diagram sideways. Score = crossings,
-lines through boxes, bends, label fit, and how large text ends up when fit
-into `frame`. To steer: force `direction: down|right` on a group, narrow the
-`frame`, reorder nodes, or pin `col`.
-
-## When the user reports a problem
+## Steering the layout
+The renderer tries every combination of direction, group folding, placement and
+spacing (16 layouts for a typical spec, more with `direction: auto`) and keeps the
+best score: crossings, lines through boxes, bends, label fit, and text size when
+fitted into `frame`. A group whose members form a chain may be **folded** (stacked
+top-to-bottom inside its box). When the user reports a problem:
 - "Too wide" → `direction: down` on the longest chain group, or `frame: [1200, 900]`.
 - "Tangled / crossing lines" → reorder nodes to match the flow; pin `col` on 1–2 nodes.
 - "Text overflows" → shorten or `\n`-wrap the label.

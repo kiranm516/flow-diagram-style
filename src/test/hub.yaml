@@ -1,0 +1,21 @@
+title: Event Bus
+nodes:
+  web:   {label: Web App, role: client}
+  mob:   {label: Mobile App, role: client}
+  gw:    {label: API Gateway, role: activity}
+  bus:   {label: Event Bus, role: service}
+  ord:   {label: Order Service, role: member}
+  pay:   {label: Payment Service, role: member}
+  ship:  {label: Shipping Service, role: member}
+  stripe: {label: Stripe, role: external}
+  db:    {label: Orders DB, role: storage}
+edges:
+  - [web, gw, Calls API]
+  - [mob, gw, Calls API]
+  - [gw, bus, Publishes Commands]
+  - [bus, ord, Delivers Events]
+  - [bus, pay, Delivers Events]
+  - [bus, ship, Delivers Events]
+  - [pay, stripe, Charges Card]
+  - [ord, db, Writes Orders]
+  - [ship, bus, Emits Shipped]

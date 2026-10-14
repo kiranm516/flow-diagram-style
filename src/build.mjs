@@ -6,15 +6,22 @@ const b64 = (p) => fs.readFileSync(p).toString("base64");
 const safe = (s) => s.replace(/<\/script/gi, "<\\/script");
 const engine = r("engine.mjs").replace(/^export (function|const|async function) /gm, "$1 ");
 if (/^\s*(import|export)\b/m.test(engine)) throw new Error("engine still has import/export");
+// The tool's "Spec reference" panel is the spec block from SKILL.md, so there is one source.
+const specRef = r("../SKILL.md").match(/## Spec format\s+```yaml\n([\s\S]*?)```/)?.[1];
+if (!specRef) throw new Error("SKILL.md: no ```yaml block under ## Spec format");
+const escHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 let html = r("tool.template.html");
 const parts = {
   "/*__ELK__*/": safe(r("node_modules/elkjs/lib/elk.bundled.js")),
   "/*__YAML__*/": safe(r("node_modules/js-yaml/dist/browser/js-yaml.umd.min.js")),
   "/*__ENGINE__*/": safe(engine),
+  "__SPEC_REF__": escHtml(specRef.trimEnd()),
   "__EXAMPLE__": safe(JSON.stringify(r(ex))),
   "__FONT_INTER__": b64("node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2"),
   "__FONT_MONO__": b64("node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2"),
 };
+const unknown = [...new Set(html.match(/__[A-Z_]+__/g))].filter((k) => !Object.keys(parts).some((p) => p.includes(k)));
+if (unknown.length) throw new Error(`template placeholders with no value: ${unknown.join(", ")}`);
 for (const [k, v] of Object.entries(parts)) html = html.split(k).join(v);
 fs.writeFileSync(out, html);
 console.log(`wrote ${out} (${(html.length / 1024 / 1024).toFixed(2)} MB)`);
