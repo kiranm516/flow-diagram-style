@@ -68,42 +68,49 @@ readers) and `midnight` (dark).
 
 ## Installation
 
-### Claude Code
+Pick a skills folder for your assistant:
 
-Clone the repo into your skills folder:
+| Assistant      | Just for you (every project) | For one project (shared with the team) |
+|----------------|------------------------------|----------------------------------------|
+| Claude Code    | `~/.claude/skills/`          | `.claude/skills/`                      |
+| GitHub Copilot | `~/.copilot/skills/`         | `.github/skills/`                      |
+
+Copilot also reads the Claude folders, so if you use both assistants, one copy
+in a Claude folder serves both. Copilot uses the skill in VS Code agent mode, the
+Copilot CLI and the Copilot cloud agent.
+
+### Just for you
+
+Clone the repo, so you can update it with `git pull` later:
 
 ```bash
-# for you, in every project
 git clone https://github.com/kiranm516/flow-diagram-style.git ~/.claude/skills/flow-diagram-style
-
-# or for one project (shared with the team through the repo)
-git clone https://github.com/kiranm516/flow-diagram-style.git .claude/skills/flow-diagram-style
 ```
 
-To let Claude render diagrams itself (rather than handing you a spec), install
-the renderer's dependencies once. This needs Node 18 or newer:
+### For one project
+
+Copy the files in without the repo's git history. A plain clone would create a
+repo inside your repo, which git doesn't commit properly: teammates, and
+Copilot's cloud agent, would get an empty folder.
+
+```bash
+git clone --depth 1 https://github.com/kiranm516/flow-diagram-style.git .claude/skills/flow-diagram-style
+rm -rf .claude/skills/flow-diagram-style/.git
+git add .claude/skills/flow-diagram-style && git commit -m "Add flow-diagram-style skill"
+```
+
+### Optional: rendering files
+
+The default flow (opening the HTML tool) needs only Node 18+. If you also
+want the assistant to write `.svg` and `.drawio` files directly, install the
+renderer's dependencies once:
 
 ```bash
 npm install --prefix ~/.claude/skills/flow-diagram-style/src
 ```
 
-### GitHub Copilot
-
-Copilot reads the same `SKILL.md` format in VS Code agent mode, the Copilot CLI
-and the Copilot cloud agent. Clone the repo into a Copilot skills folder:
-
-```bash
-# for you, in every project
-git clone https://github.com/kiranm516/flow-diagram-style.git ~/.copilot/skills/flow-diagram-style
-
-# or for one repository (the cloud agent only sees skills committed to the repo)
-git clone https://github.com/kiranm516/flow-diagram-style.git .github/skills/flow-diagram-style
-```
-
-Then run the same `npm install --prefix <skill folder>/src` if Copilot should
-render diagrams itself. Copilot also picks up skills in `~/.claude/skills/` and
-`.claude/skills/`, so if you use both assistants, one copy in a Claude folder
-serves both.
+Don't commit `src/node_modules` in a project install. Each person runs this
+themselves.
 
 ### Claude apps (claude.ai, desktop)
 
@@ -113,6 +120,37 @@ Zip the repo folder (without `src/node_modules`) and upload it under
 ### Without an assistant
 
 Open [`flow-diagram.html`](flow-diagram.html) in any browser. No install needed.
+
+## Updating
+
+Your diagrams live in your own projects (`diagrams/*.yaml`), not in the skill
+folder, so updating never touches them.
+
+**Just for you** (cloned):
+
+```bash
+git -C ~/.claude/skills/flow-diagram-style pull
+```
+
+**For one project** (copied): replace the folder with a fresh copy and commit it.
+
+```bash
+rm -rf .claude/skills/flow-diagram-style
+git clone --depth 1 https://github.com/kiranm516/flow-diagram-style.git .claude/skills/flow-diagram-style
+rm -rf .claude/skills/flow-diagram-style/.git
+git add -A .claude/skills/flow-diagram-style && git commit -m "Update flow-diagram-style skill"
+```
+
+**Claude apps:** download the latest version, zip it again, and upload it under
+**Settings → Capabilities → Skills**, replacing the old one.
+
+**Afterwards:**
+- If you installed the rendering dependencies, run the `npm install --prefix …/src`
+  command again in case they changed.
+- Start a new assistant session so it reads the new `SKILL.md`.
+- If you keep a copy of `flow-diagram.html` elsewhere (bookmarked, or shared on
+  a drive), replace it with the new one. Your last spec in the browser is kept
+  as long as the file stays at the same path.
 
 ## Usage
 
