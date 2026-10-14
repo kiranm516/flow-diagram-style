@@ -14,7 +14,7 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--ink); font: 14px/1.45 Inter, 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; }
-header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 header h1 { font: 500 15px 'JetBrains Mono', Consolas, monospace; margin: 0 8px 0 0; letter-spacing: -0.01em; }
 .spacer { flex: 1; }
 button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
@@ -26,6 +26,7 @@ button.primary { background: var(--accent); color: var(--accent-ink); border-col
 .sep { width: 1px; height: 22px; background: var(--line); }
 main { flex: 1; display: grid; grid-template-columns: minmax(320px, 36%) 1fr; min-height: 0; }
 .left { display: flex; flex-direction: column; border-right: 1px solid var(--line); min-height: 0; background: var(--panel); }
+textarea.drop { outline: 2px dashed var(--accent); outline-offset: -6px; }
 textarea { flex: 1; width: 100%; border: 0; resize: none; padding: 14px 16px; font: 13px/1.55 'JetBrains Mono', Consolas, monospace; color: var(--ink); background: var(--panel); outline: none; tab-size: 2; }
 details { border-top: 1px solid var(--line); padding: 8px 16px 12px; font-size: 13px; max-height: 45%; overflow: auto; }
 summary { cursor: pointer; color: var(--muted); padding: 4px 0; }
@@ -34,7 +35,9 @@ summary { cursor: pointer; color: var(--muted); padding: 4px 0; }
 code, pre { font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px; }
 pre { background: var(--bg); padding: 8px 10px; border-radius: 6px; overflow: auto; margin: 6px 0; }
 .right { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-#status { padding: 8px 16px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--panel); min-height: 36px; }
+.statusbar { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 0; border-bottom: 1px solid var(--line); background: var(--panel); }
+.statusbar button { padding: 3px 10px; font-size: 13px; }
+#status { flex: 1; padding: 6px 16px; font-size: 13px; color: var(--muted); min-height: 32px; border-radius: 0 6px 6px 0; }
 #status.err { background: var(--err-bg); color: var(--err); white-space: pre-wrap; }
 #status.ok { color: var(--ok); }
 #stage { flex: 1; overflow: auto; padding: 20px; display: flex; align-items: flex-start; justify-content: center; }
@@ -48,8 +51,25 @@ pre { background: var(--bg); padding: 8px 10px; border-radius: 6px; overflow: au
 <header>
   <h1>flow-diagram</h1>
   <button class="primary" id="renderBtn" title="Ctrl/Cmd + Enter">Render</button>
-  <label class="hint" for="theme" style="margin-left:4px">Theme</label>
-  <select id="theme" aria-label="Colour theme"></select>
+  <div class="group">
+    <button id="openBtn" title="Open a .yaml spec (or drop one on the editor)">Open</button>
+    <button id="saveBtn" title="Download the spec as .yaml">Save spec</button>
+    <button id="linkBtn" title="Copy a link that opens this exact diagram">Copy link</button>
+    <input type="file" id="fileIn" accept=".yaml,.yml,.txt" hidden>
+  </div>
+  <span class="sep"></span>
+  <select id="theme" aria-label="Colour theme" title="Colour theme"></select>
+  <select id="direction" aria-label="Direction" title="Flow direction">
+    <option value="right">Left → right</option><option value="down">Top → down</option><option value="auto">Auto direction</option>
+  </select>
+  <select id="sizing" aria-label="Box sizing" title="Box sizes">
+    <option value="role">Size by role</option><option value="group">Size by group</option><option value="all">Equal sizes</option><option value="fit">Fit labels</option>
+  </select>
+  <div class="group" title="Step through the best alternative layouts">
+    <button id="prevLayout" disabled aria-label="Previous layout">&#8249;</button>
+    <span class="hint" id="layoutNo" style="align-self:center;min-width:64px;text-align:center">Layout –</span>
+    <button id="nextLayout" disabled aria-label="Next layout">&#8250;</button>
+  </div>
   <span class="spacer"></span>
   <div class="group">
     <button id="copyPng" disabled title="Paste into Teams, PowerPoint, Confluence">Copy image</button>
@@ -61,8 +81,6 @@ pre { background: var(--bg); padding: 8px 10px; border-radius: 6px; overflow: au
     <button id="dlSvg" disabled>SVG</button>
     <button id="dlDrawio" disabled>.drawio</button>
   </div>
-  <span class="sep"></span>
-  <button id="zoomBtn" disabled title="Toggle fit / actual size">Actual size</button>
 </header>
 <main>
   <section class="left">
@@ -76,6 +94,7 @@ frame: [1600, 900]            # optional: slide/screen to fit; layout keeps text
 sizing: role                  # role (default): same role -&gt; same width, all boxes same height
                               # group: same role in same group | all: one size | fit: per label
 theme: classic                # classic | tint | teal | mono | okabe | midnight (see themes.png)
+layout: 2                     # optional: use the Nth best layout (set by the tool's ‹ › buttons)
 
 groups:
   checkout: {label: Checkout Service}
@@ -95,7 +114,7 @@ edges:
     </details>
   </section>
   <section class="right">
-    <div id="status">Loading…</div>
+    <div class="statusbar"><div id="status">Loading…</div><button id="zoomBtn" disabled title="Toggle fit / actual size">Actual size</button></div>
     <div id="stage"></div>
   </section>
 </main>
@@ -6747,7 +6766,7 @@ module.exports = browser_default;
 //# sourceMappingURL=js-yaml.umd.min.js.map</script>
 <script>// flowdiag engine — runs in the browser and in Node. No imports: dependencies are injected.
 //   const eng = createEngine({ ELK, measure });
-//   const { best, report } = await eng.layout(spec);
+//   const { best, alts, report } = await eng.layout(spec);   // alts: top distinct layouts, best first
 //   eng.toSVG(best, { fontCSS })  -> SVG string (house style)
 //   eng.toDrawio(best)            -> .drawio file (mxfile XML, editable shapes)
 //   eng.toDrawioModel(best)       -> <mxGraphModel> only (paste into draw.io / LeanIX)
@@ -7143,7 +7162,7 @@ function createEngine({ ELK, measure = approxMeasure, weights = {} }) {
 
   // ---------- search ----------
   const subsets = (arr) => arr.reduce((r, x) => r.concat(r.map((s) => [...s, x])), [[]]);
-  async function layout(spec, { onProgress } = {}) {
+  async function layout(spec, { onProgress, maxAlts = 6 } = {}) {
     const edges = validate(spec);
     const elk = new ELK();
     const want = String(spec.direction || "right").toUpperCase();
@@ -7157,8 +7176,7 @@ function createEngine({ ELK, measure = approxMeasure, weights = {} }) {
       for (const placement of ["NETWORK_SIMPLEX", "BRANDES_KOEPF"]) for (const modelOrder of ["NODES_AND_EDGES", "NONE"])
         for (const layerGap of [Math.round(maxLab * 0.55 + 30), Math.round(maxLab + 40)])
           cfgs.push({ direction, folds, placement, modelOrder, layerGap, nodeGap: 40, aspect: frame[0] / frame[1], partition: hasCols });
-    let best = null;
-    const report = [];
+    const found = [], report = [];
     for (let k = 0; k < cfgs.length; k++) {
       const cfg = cfgs[k];
       await onProgress?.(k + 1, cfgs.length);
@@ -7170,11 +7188,17 @@ function createEngine({ ELK, measure = approxMeasure, weights = {} }) {
       if (E.some((e) => e.pts.length < 2)) { report.push({ cfg, error: "edge without route" }); continue; }
       const s = score(laid, E, nodes, groups, frame);
       report.push({ cfg, s });
-      if (!best || s.total < best.s.total) best = { W: laid.width, H: laid.height, E, nodes, groups, s, cfg, theme: spec.theme || "classic" };
+      found.push({ W: laid.width, H: laid.height, E, nodes, groups, s, cfg, theme: spec.theme || "classic" });
     }
-    if (!best) throw new Error("no layout succeeded: " + (report[0]?.error || "unknown"));
+    if (!found.length) throw new Error("no layout succeeded: " + (report[0]?.error || "unknown"));
     report.sort((a, b) => (a.s?.total ?? 1e9) - (b.s?.total ?? 1e9));
-    return { best, report };
+    // alts: the best few *different* layouts (many configs produce the same picture), best first
+    const alts = [], seen = new Set();
+    for (const r of found.sort((a, b) => a.s.total - b.s.total)) {
+      const key = `${r.s.total}|${r.s.W}|${r.s.H}`;
+      if (!seen.has(key) && alts.length < maxAlts) { seen.add(key); alts.push(r); }
+    }
+    return { best: alts[0], alts, report };
   }
 
   // ---------- SVG ----------
@@ -7288,10 +7312,41 @@ function createEngine({ ELK, measure = approxMeasure, weights = {} }) {
   const exportBtns = ["copyPng", "copyDrawio", "dlPng", "dlSvg", "dlDrawio", "zoomBtn"].map($);
   const KEY = "flowdiag.spec.v1";
 
+  // ---------- spec <-> link (#spec=<deflate-raw, base64url>; same format as src/open.mjs) ----------
+  const LINK_RE = /#spec=([\w-]+)/;
+  async function decodeSpec(b64) {
+    const std = b64.replace(/-/g, "+").replace(/_/g, "/");
+    const bytes = Uint8Array.from(atob(std + "=".repeat((4 - (std.length % 4)) % 4)), (c) => c.charCodeAt(0));
+    return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+  }
+  async function encodeSpec(text) {
+    const buf = new Uint8Array(await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer());
+    let bin = "";
+    for (const b of buf) bin += String.fromCharCode(b);
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
 
   try { ta.value = localStorage.getItem(KEY) || EXAMPLE; } catch { ta.value = EXAMPLE; }
+  // A spec in the URL (from open.mjs or "Copy link") wins over the saved one. Drop it from the
+  // address bar afterwards so a reload keeps your edits instead of reloading the original.
+  async function loadFromURL() {
+    const m = location.hash.match(LINK_RE);
+    if (!m) return;
+    try { ta.value = await decodeSpec(m[1]); history.replaceState(null, "", location.pathname + location.search); }
+    catch (e) { setStatus("Could not read the spec in the link: " + e.message, "err"); }
+  }
 
-  const themeSel = $("theme");
+  // Toolbar choices are written into the YAML, so the saved spec always matches what you see.
+  function setTopKey(text, key, value) {
+    const re = new RegExp(`^${key}:[^\\n]*$`, "m"), line = `${key}: ${value}`;
+    if (re.test(text)) return text.replace(re, line);
+    const t = text.match(/^title:[^\n]*$/m);
+    if (t) { const i = t.index + t[0].length; return text.slice(0, i) + "\n" + line + text.slice(i); }
+    return line + "\n" + text;
+  }
+  const dropTopKey = (text, key) => text.replace(new RegExp(`^${key}:[^\\n]*\\n?`, "m"), "");
+
+  const themeSel = $("theme"), dirSel = $("direction"), sizeSel = $("sizing");
   const THEME_LABELS = { classic: "Classic", tint: "Soft Tint", teal: "Teal 2026", mono: "Graphite", okabe: "Colour-blind safe", midnight: "Midnight (dark)" };
   themeSel.innerHTML = Object.keys(THEMES).map((k) => `<option value="${k}">${THEME_LABELS[k] || k}</option>`).join("");
   try { themeSel.value = localStorage.getItem(KEY + ".theme") || "classic"; } catch {}
@@ -7303,9 +7358,13 @@ function createEngine({ ELK, measure = approxMeasure, weights = {} }) {
   paintSwatches();
   themeSel.onchange = () => {
     try { localStorage.setItem(KEY + ".theme", themeSel.value); } catch {}
+    ta.value = setTopKey(ta.value, "theme", themeSel.value);
+    try { localStorage.setItem(KEY, ta.value); } catch {}
     paintSwatches();
-    if (current) { current.best.theme = themeSel.value; current.svg = engine.toSVG(current.best, { fontCSS: FONT_CSS }); stage.innerHTML = current.svg; }
+    if (current) show(current.idx); // repaint only; the layout doesn't depend on the theme
   };
+  dirSel.onchange = () => { ta.value = setTopKey(ta.value, "direction", dirSel.value); render(); };
+  sizeSel.onchange = () => { ta.value = setTopKey(ta.value, "sizing", sizeSel.value); render(); };
 
   // real text measurement with the embedded fonts
   const ctx = document.createElement("canvas").getContext("2d");
@@ -7317,30 +7376,76 @@ function createEngine({ ELK, measure = approxMeasure, weights = {} }) {
   const enable = (on) => exportBtns.forEach((b) => (b.disabled = !on));
   const safeName = () => String((current && current.spec.title) || "flow-diagram").trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "flow-diagram";
 
+  // Show alternative layout i (0 = best score).
+  function show(i, remember = false) {
+    const { alts, tried } = current;
+    current.idx = i;
+    if (remember) { // the picked layout is stored in the spec as layout: N (1 = best, the default)
+      ta.value = i === 0 ? dropTopKey(ta.value, "layout") : setTopKey(ta.value, "layout", i + 1);
+      try { localStorage.setItem(KEY, ta.value); } catch {}
+    }
+    current.best = alts[i];
+    current.best.theme = themeSel.value;
+    current.svg = engine.toSVG(current.best, { fontCSS: FONT_CSS });
+    stage.innerHTML = current.svg;
+    $("layoutNo").textContent = `Layout ${i + 1}/${alts.length}`;
+    $("prevLayout").disabled = i === 0;
+    $("nextLayout").disabled = i === alts.length - 1;
+    const s = current.best.s;
+    const issues = [s.crossings && `${s.crossings} crossing${s.crossings > 1 ? "s" : ""}`, s.through && `${s.through} line(s) through boxes`].filter(Boolean);
+    setStatus(`${i === 0 ? `Best of ${tried} layouts` : `Alternative ${i + 1} of ${alts.length}`} · ${Math.round(s.W)}×${Math.round(s.H)} · ${issues.length ? issues.join(", ") : "no crossings"}`, "ok");
+  }
+
   async function render() {
     const id = ++runId;
+    // a pasted "Copy link" URL loads the spec inside it
+    const link = ta.value.trim().match(new RegExp("^\\S*" + LINK_RE.source + "$"));
+    if (link) { try { ta.value = await decodeSpec(link[1]); } catch (e) { setStatus("Could not read the spec in that link: " + e.message, "err"); return; } }
     let spec;
     try { spec = jsyaml.load(ta.value); } catch (e) { setStatus("YAML error: " + e.message, "err"); return; }
     try { localStorage.setItem(KEY, ta.value); } catch {}
+    if (spec && typeof spec === "object") {
+      dirSel.value = String(spec.direction || "right").toLowerCase();
+      sizeSel.value = String(spec.sizing || "role").toLowerCase();
+    }
     setStatus("Laying out…");
     try {
-      const { best, report } = await engine.layout(spec, {
+      const { alts, report } = await engine.layout(spec, {
         onProgress: (k, n) => { if (id === runId) setStatus(`Trying layouts… ${k}/${n}`); return new Promise((r) => setTimeout(r, 0)); },
       });
       if (id !== runId) return;
       if (spec.theme && THEMES[String(spec.theme).toLowerCase()]) { themeSel.value = String(spec.theme).toLowerCase(); paintSwatches(); }
-      best.theme = themeSel.value;
-      const svg = engine.toSVG(best, { fontCSS: FONT_CSS });
-      current = { spec, best, svg };
-      stage.innerHTML = svg;
+      current = { spec, alts, tried: report.filter((r) => r.s).length, idx: 0 };
+      show(Math.min(alts.length, Math.max(1, parseInt(spec.layout, 10) || 1)) - 1);
       enable(true);
-      const s = best.s, ok = report.filter((r) => r.s).length;
-      const issues = [s.crossings && `${s.crossings} crossing${s.crossings > 1 ? "s" : ""}`, s.through && `${s.through} line(s) through boxes`].filter(Boolean);
-      setStatus(`Best of ${ok} layouts · ${Math.round(best.W)}×${Math.round(best.H)} · ${issues.length ? issues.join(", ") : "no crossings"}`, "ok");
     } catch (e) {
       if (id === runId) setStatus(String(e.message || e), "err");
     }
   }
+  $("prevLayout").onclick = () => current && current.idx > 0 && show(current.idx - 1, true);
+  $("nextLayout").onclick = () => current && current.idx < current.alts.length - 1 && show(current.idx + 1, true);
+
+  // ---------- open / save / link ----------
+  async function loadFile(file) {
+    if (!file) return;
+    ta.value = await file.text();
+    render();
+  }
+  $("openBtn").onclick = () => $("fileIn").click();
+  $("fileIn").onchange = (ev) => { loadFile(ev.target.files[0]); ev.target.value = ""; };
+  ta.addEventListener("dragover", (e) => { e.preventDefault(); ta.classList.add("drop"); });
+  ta.addEventListener("dragleave", () => ta.classList.remove("drop"));
+  ta.addEventListener("drop", (e) => { e.preventDefault(); ta.classList.remove("drop"); loadFile(e.dataTransfer.files[0]); });
+  $("saveBtn").onclick = () => {
+    let title; try { title = jsyaml.load(ta.value)?.title; } catch {}
+    const name = String(title || "flow-diagram").trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "flow-diagram";
+    download(name + ".yaml", new Blob([ta.value], { type: "text/yaml" }));
+  };
+  $("linkBtn").onclick = async (ev) => {
+    const url = location.href.split("#")[0] + "#spec=" + await encodeSpec(ta.value);
+    try { await navigator.clipboard.writeText(url); flash(ev.target, "Copied ✓"); }
+    catch { setStatus("Clipboard blocked — copy this link:\n" + url, "err"); }
+  };
 
   // ---------- exports ----------
   function download(name, blob) {
@@ -7394,7 +7499,7 @@ function createEngine({ ELK, measure = approxMeasure, weights = {} }) {
   let timer;
   ta.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(render, 1200); });
 
-  Promise.all([document.fonts.load("17px Inter"), document.fonts.load("16px 'JetBrains Mono'")]).catch(() => {}).then(render);
+  Promise.all([document.fonts.load("17px Inter"), document.fonts.load("16px 'JetBrains Mono'"), loadFromURL()]).catch(() => {}).then(render);
 })();
 </script>
 </body>

@@ -25,11 +25,12 @@ function fontCSS() {
 
 const spec = yaml.load(fs.readFileSync(specPath, "utf8"));
 const eng = createEngine({ ELK, weights: process.env.FLOWDIAG_WEIGHTS ? JSON.parse(process.env.FLOWDIAG_WEIGHTS) : {} });
-const { best, report } = await eng.layout(spec);
+const { alts, report } = await eng.layout(spec);
+const best = alts[Math.min(alts.length, Math.max(1, parseInt(spec.layout, 10) || 1)) - 1]; // layout: N = Nth best
 fs.writeFileSync(out + ".svg", eng.toSVG(best, { fontCSS: fontCSS() }));
 fs.writeFileSync(out + ".drawio", eng.toDrawio(best, path.basename(out)));
 const c = best.cfg;
-console.log(`best of ${report.filter((r) => r.s).length}/${report.length}: ${c.direction} folds=[${c.folds}] ${c.placement} order=${c.modelOrder} layerGap=${c.layerGap}`);
+console.log(`${best === alts[0] ? "best" : `layout ${alts.indexOf(best) + 1}`} of ${report.filter((r) => r.s).length}/${report.length}: ${c.direction} folds=[${c.folds}] ${c.placement} order=${c.modelOrder} layerGap=${c.layerGap}`);
 console.log("score:", JSON.stringify(best.s));
 console.log(`wrote ${out}.svg, ${out}.drawio`);
 if (flags.includes("--report"))

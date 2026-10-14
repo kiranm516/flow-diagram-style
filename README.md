@@ -125,31 +125,61 @@ in plain words:
 > API, which publishes to Kafka; the fulfilment workers consume it and write to
 > Postgres. I need it in Confluence.
 
-The assistant writes the YAML spec. If it can run commands, it also renders
-`.svg` and `.drawio` files. If not, it gives you the spec to paste into the HTML
-tool.
+The assistant saves the spec as a `.yaml` file (by default under `diagrams/`)
+and opens it in the HTML tool, so you decide the final look before exporting.
+If it can't run commands, it gives you the spec to paste into the tool instead.
+The tool is where you take over:
+
+```text
+ assistant writes            browser opens               you adjust                 you export
+ diagrams/checkout.yaml  ->  flow-diagram.html#spec=…  ->  theme, direction,      ->  draw.io, PNG,
+                                                           layout, the YAML itself     SVG, image
+                                                                  |
+                                                     Save spec -> back into diagrams/checkout.yaml
+```
+
+To change the diagram later, save your edits over the `.yaml` first. The
+assistant then works from your version.
 
 ### The HTML tool
 
-1. Open `flow-diagram.html` and paste a spec into the left pane. The diagram
-   re-renders as you type (or press Ctrl/Cmd + Enter).
-2. Pick a theme from the toolbar if you want one.
-3. Export:
+Open `flow-diagram.html` directly, or with a spec preloaded:
 
-   | Button           | Use it for                                                       |
-   |------------------|------------------------------------------------------------------|
-   | Copy for draw.io | Click a draw.io, LeanIX or Confluence draw.io canvas and Ctrl+V   |
-   | Copy image       | Paste into Teams, PowerPoint or a Confluence page                 |
-   | PNG / SVG        | Download an image (PNG is 2× for sharp slides)                    |
-   | .drawio          | Download a file for File → Import in draw.io                      |
+```bash
+node src/open.mjs diagrams/checkout.yaml          # opens your browser
+node src/open.mjs diagrams/checkout.yaml --print  # just prints the link
+```
 
-Your last spec and theme are remembered in the browser.
+`open.mjs` needs only Node 18+, with no `npm install`. The spec travels inside
+the link itself, so nothing is uploaded and no server is involved.
+
+| Control                  | What it does                                                             |
+|--------------------------|--------------------------------------------------------------------------|
+| Editor (left)            | Edit the YAML; the diagram re-renders as you type (or Ctrl/Cmd + Enter)  |
+| Open / drag a file       | Load a `.yaml` spec                                                      |
+| Save spec                | Download the current spec as `.yaml`                                     |
+| Copy link                | Copy a link containing the spec (see below)                              |
+| Theme, direction, sizing | Restyle or re-lay out; your choice is written into the YAML              |
+| ‹ Layout n/6 ›           | Step through the best alternative layouts; your pick is saved as `layout: n` |
+| Copy for draw.io         | Click a draw.io, LeanIX or Confluence draw.io canvas and press Ctrl+V    |
+| Copy image               | Paste into Teams, PowerPoint or a Confluence page                        |
+| PNG / SVG                | Download an image (PNG is 2× for sharp slides)                           |
+| .drawio                  | Download a file for File → Import in draw.io                             |
+| Actual size              | Toggle between fit-to-window and 100%                                    |
+
+Your last spec and theme are remembered in the browser. A link from
+**Copy link** points at the tool on your machine. To share a diagram with
+someone else, send them the link; they paste it into the editor of their own
+copy of `flow-diagram.html`, and it loads.
 
 ### Command line
 
+For automation, or when you want files without the browser:
+
 ```bash
-node src/flowdiag.mjs my-diagram.yaml out/my-diagram
-# -> out/my-diagram.svg, out/my-diagram.drawio
+npm install --prefix src   # once
+node src/flowdiag.mjs diagrams/checkout.yaml out/checkout
+# -> out/checkout.svg, out/checkout.drawio
 ```
 
 Add `--report` to print the scores of the runner-up layouts.
@@ -163,6 +193,7 @@ Add `--report` to print the scores of the runner-up layouts.
 | `frame`     | `[width, height]` to fit, e.g. a slide                      | `[1600, 900]` |
 | `sizing`    | `role` (same role, same width), `group`, `all`, `fit`        | `role`  |
 | `theme`     | `classic`, `tint`, `teal`, `mono`, `okabe`, `midnight`       | `classic` |
+| `layout`    | Use the Nth best layout (set by the tool's ‹ › buttons)     | `1`     |
 | `groups`    | `id: {label, parent?, direction?}`; nesting up to 2 levels  |         |
 | `nodes`     | `id: {label, role, group?, col?}`; `\n` in a label wraps it  |         |
 | `edges`     | `[from, to, Label]`; `from` and `to` may be groups           |         |
@@ -191,6 +222,7 @@ example.yaml          example spec (also the HTML tool's starting content)
 flow-diagram.html     built offline tool (generated, but committed)
 src/engine.mjs        layout search, scoring, SVG and draw.io output
 src/flowdiag.mjs      command-line renderer
+src/open.mjs          opens the HTML tool with a spec preloaded
 src/tool.template.html  HTML tool source
 src/build.mjs         bundles the template, engine, libraries and fonts
 src/test.mjs          layout regression test; fixtures in src/test/

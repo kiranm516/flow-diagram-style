@@ -1,6 +1,6 @@
 // flowdiag engine — runs in the browser and in Node. No imports: dependencies are injected.
 //   const eng = createEngine({ ELK, measure });
-//   const { best, report } = await eng.layout(spec);
+//   const { best, alts, report } = await eng.layout(spec);   // alts: top distinct layouts, best first
 //   eng.toSVG(best, { fontCSS })  -> SVG string (house style)
 //   eng.toDrawio(best)            -> .drawio file (mxfile XML, editable shapes)
 //   eng.toDrawioModel(best)       -> <mxGraphModel> only (paste into draw.io / LeanIX)
@@ -396,7 +396,7 @@ export function createEngine({ ELK, measure = approxMeasure, weights = {} }) {
 
   // ---------- search ----------
   const subsets = (arr) => arr.reduce((r, x) => r.concat(r.map((s) => [...s, x])), [[]]);
-  async function layout(spec, { onProgress } = {}) {
+  async function layout(spec, { onProgress, maxAlts = 6 } = {}) {
     const edges = validate(spec);
     const elk = new ELK();
     const want = String(spec.direction || "right").toUpperCase();
@@ -410,8 +410,7 @@ export function createEngine({ ELK, measure = approxMeasure, weights = {} }) {
       for (const placement of ["NETWORK_SIMPLEX", "BRANDES_KOEPF"]) for (const modelOrder of ["NODES_AND_EDGES", "NONE"])
         for (const layerGap of [Math.round(maxLab * 0.55 + 30), Math.round(maxLab + 40)])
           cfgs.push({ direction, folds, placement, modelOrder, layerGap, nodeGap: 40, aspect: frame[0] / frame[1], partition: hasCols });
-    let best = null;
-    const report = [];
+    const found = [], report = [];
     for (let k = 0; k < cfgs.length; k++) {
       const cfg = cfgs[k];
       await onProgress?.(k + 1, cfgs.length);
@@ -423,11 +422,17 @@ export function createEngine({ ELK, measure = approxMeasure, weights = {} }) {
       if (E.some((e) => e.pts.length < 2)) { report.push({ cfg, error: "edge without route" }); continue; }
       const s = score(laid, E, nodes, groups, frame);
       report.push({ cfg, s });
-      if (!best || s.total < best.s.total) best = { W: laid.width, H: laid.height, E, nodes, groups, s, cfg, theme: spec.theme || "classic" };
+      found.push({ W: laid.width, H: laid.height, E, nodes, groups, s, cfg, theme: spec.theme || "classic" });
     }
-    if (!best) throw new Error("no layout succeeded: " + (report[0]?.error || "unknown"));
+    if (!found.length) throw new Error("no layout succeeded: " + (report[0]?.error || "unknown"));
     report.sort((a, b) => (a.s?.total ?? 1e9) - (b.s?.total ?? 1e9));
-    return { best, report };
+    // alts: the best few *different* layouts (many configs produce the same picture), best first
+    const alts = [], seen = new Set();
+    for (const r of found.sort((a, b) => a.s.total - b.s.total)) {
+      const key = `${r.s.total}|${r.s.W}|${r.s.H}`;
+      if (!seen.has(key) && alts.length < maxAlts) { seen.add(key); alts.push(r); }
+    }
+    return { best: alts[0], alts, report };
   }
 
   // ---------- SVG ----------

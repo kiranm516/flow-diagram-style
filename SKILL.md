@@ -10,16 +10,34 @@ renderer decides *how* it looks and *where* things go. Never write coordinates,
 colors, fonts, SVG, Mermaid or draw.io XML yourself.
 
 ## How the spec becomes a diagram
-- **No code execution (default at work):** output the YAML in a code block and
-  tell the user to paste it into `flow-diagram.html` (opens in any browser,
-  works offline, nothing is uploaded). From there they export:
-  - **Copy for draw.io** → click the draw.io / LeanIX / Confluence-draw.io canvas, Ctrl+V.
-    (Fallback: download `.drawio` and use File → Import, or Extras → Edit Diagram.)
-  - **Copy image** → paste into Teams or PowerPoint.
-  - **PNG / SVG** → Confluence pages, slides.
-- **With code execution (Node 18+):** once, `npm install --prefix <skill>/src`; then
-  `node <skill>/src/flowdiag.mjs my.yaml out/my` → `out/my.svg` + `out/my.drawio`
-  (paths relative to the current directory; add `--report` to see the runner-up layouts).
+Always finish in the interactive tool, `flow-diagram.html` in this skill's folder,
+so the user can adjust the diagram before exporting it. Don't produce finished
+image files unless they ask for them.
+
+1. **Save the spec** as a `.yaml` file: an existing spec the user points to, else
+   `diagrams/<title-in-kebab-case>.yaml` in the current project.
+2. **Open it in the tool.** If you can run commands:
+   `node <skill>/src/open.mjs diagrams/<name>.yaml`
+   This opens the browser with the spec loaded. It needs Node 18+ but no
+   `npm install`, and nothing is uploaded. If the browser can't be opened (e.g.
+   a remote or cloud session), it prints a link instead: pass it on.
+   If you can't run commands, show the YAML in a code block and tell the user to
+   open `flow-diagram.html` and paste it in (or use **Open** to load the `.yaml`).
+3. **Tell the user what they can do there**, in a line or two:
+   - Change the theme, direction and box sizing from the toolbar. Their choices
+     are written into the YAML.
+   - Use ‹ › to step through the best alternative layouts.
+   - Export:
+     - **Copy for draw.io** → click a draw.io / LeanIX / Confluence draw.io canvas and press Ctrl+V.
+     - **Copy image** → paste into Teams or PowerPoint.
+     - **PNG / SVG** → Confluence pages and slides.
+   - **Save spec** to keep their edits.
+4. **Before changing that diagram again,** ask the user to save over the `.yaml`
+   if they edited it in the tool, and work from that file.
+
+Only when the user asks for files (or for automation): run
+`npm install --prefix <skill>/src` once, then
+`node <skill>/src/flowdiag.mjs diagrams/<name>.yaml out/<name>` → `.svg` + `.drawio`.
 
 ## Spec format
 ```yaml
@@ -29,6 +47,7 @@ frame: [1600, 900]            # optional: slide/screen to fit; layout keeps text
 sizing: role                  # role (default): same role -> same width, all boxes same height
                               # group: same role in same group | all: one size | fit: per label
 theme: classic                # classic | tint | teal | mono | okabe | midnight (see themes.png)
+layout: 2                     # optional: use the Nth best layout (set by the tool's ‹ › buttons)
 
 groups:
   checkout: {label: Checkout Service}
@@ -86,6 +105,7 @@ spacing (16 layouts for a typical spec, more with `direction: auto`) and keeps t
 best score: crossings, lines through boxes, bends, label fit, and text size when
 fitted into `frame`. A group whose members form a chain may be **folded** (stacked
 top-to-bottom inside its box). When the user reports a problem:
+- "Almost right" → have them try ‹ › in the tool first; it saves their pick as `layout: N`.
 - "Too wide" → `direction: down` on the longest chain group, or `frame: [1200, 900]`.
 - "Tangled / crossing lines" → reorder nodes to match the flow; pin `col` on 1–2 nodes.
 - "Text overflows" → shorten or `\n`-wrap the label.
