@@ -1,11 +1,12 @@
 # flow-diagram-style
 
-A Claude skill for drawing system, architecture and pipeline diagrams in one
-consistent house style: left-to-right flow, flat boxes coloured by role, dashed
-groups with monospace titles, and thin orthogonal edges with inline verb labels.
+An [agent skill](https://agentskills.io) for Claude and GitHub Copilot that
+draws system, architecture and pipeline diagrams in one consistent house style:
+left-to-right flow, flat boxes coloured by role, dashed groups with monospace
+titles, and thin orthogonal edges with inline verb labels.
 
-You (or Claude) describe **what** is in the diagram in a short YAML spec. The
-renderer decides **how** it looks and **where** everything goes, then exports
+You (or your AI assistant) describe **what** is in the diagram in a short YAML
+spec. The renderer decides **how** it looks and **where** everything goes, then exports
 SVG, PNG, or an editable draw.io diagram (works in draw.io, LeanIX and
 Confluence).
 
@@ -86,27 +87,46 @@ the renderer's dependencies once. This needs Node 18 or newer:
 npm install --prefix ~/.claude/skills/flow-diagram-style/src
 ```
 
+### GitHub Copilot
+
+Copilot reads the same `SKILL.md` format in VS Code agent mode, the Copilot CLI
+and the Copilot cloud agent. Clone the repo into a Copilot skills folder:
+
+```bash
+# for you, in every project
+git clone https://github.com/kiranm516/flow-diagram-style.git ~/.copilot/skills/flow-diagram-style
+
+# or for one repository (the cloud agent only sees skills committed to the repo)
+git clone https://github.com/kiranm516/flow-diagram-style.git .github/skills/flow-diagram-style
+```
+
+Then run the same `npm install --prefix <skill folder>/src` if Copilot should
+render diagrams itself. Copilot also picks up skills in `~/.claude/skills/` and
+`.claude/skills/`, so if you use both assistants, one copy in a Claude folder
+serves both.
+
 ### Claude apps (claude.ai, desktop)
 
 Zip the repo folder (without `src/node_modules`) and upload it under
 **Settings → Capabilities → Skills**.
 
-### Without Claude
+### Without an assistant
 
 Open [`flow-diagram.html`](flow-diagram.html) in any browser. No install needed.
 
 ## Usage
 
-### Ask Claude
+### Ask your assistant
 
-Once the skill is installed, ask for a diagram in plain words:
+Once the skill is installed, ask Claude or Copilot (in agent mode) for a diagram
+in plain words:
 
 > Draw an architecture diagram of our checkout flow: the web app calls the Order
 > API, which publishes to Kafka; the fulfilment workers consume it and write to
 > Postgres. I need it in Confluence.
 
-Claude writes the YAML spec. With code execution it also renders `.svg` and
-`.drawio` files. Without it, Claude gives you the spec to paste into the HTML
+The assistant writes the YAML spec. If it can run commands, it also renders
+`.svg` and `.drawio` files. If not, it gives you the spec to paste into the HTML
 tool.
 
 ### The HTML tool
@@ -166,7 +186,7 @@ Every node needs a `role` and every edge needs a label:
 ## Development
 
 ```text
-SKILL.md              instructions Claude reads
+SKILL.md              instructions the assistant reads
 example.yaml          example spec (also the HTML tool's starting content)
 flow-diagram.html     built offline tool (generated, but committed)
 src/engine.mjs        layout search, scoring, SVG and draw.io output
